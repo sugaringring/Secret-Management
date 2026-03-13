@@ -1,0 +1,62 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # NEW STEP: Convert the repo name to lowercase
+      - name: Lowercase repo name
+        run: |
+          echo "REPO_LOWER=${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Use the lowercase variable we created above
+          tags: |
+            ghcr.io/${{ env.REPO_LOWER }}:latest
+            ghcr.io/${{ env.REPO_LOWER }}:${{ github.sha }}
+
+      - name: Verification - Run Container with Secrets
+        run: |
+          # Pull the image we just built
+          docker pull ghcr.io/${{ env.REPO_LOWER }}:latest
+          
+          # Run it with secrets injected as env vars
+          # We use a simple check to see if it accepts the vars; in a real app, you might curl an endpoint
+          docker run -d \
+            --name test-container \
+            -e API_KEY=${{ secrets.API_KEY }} \
+            -e PORT=3000 \
+            -p 3000:3000 \
+            ghcr.io/${{ env.REPO_LOWER }}:latest
+            
+          # Wait for it to start
+          sleep 5
+          
+          # Verify it's up
+          curl -f http://localhost:3000
+          
+          # Cleanup
+          docker stop test-container
+          docker rm test-container

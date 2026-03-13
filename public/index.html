@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure JWT App</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --error: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid #334155;
+            background-color: #0f172a;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: none;
+            background-color: var(--accent);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        #error-msg {
+            color: var(--error);
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            display: none;
+        }
+
+        #dashboard {
+            display: none;
+        }
+
+        #login-form {
+            display: block;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background-color: rgba(34, 197, 94, 0.1);
+            color: var(--success);
+            margin-top: 1rem;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .data-box {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin: 1.5rem 0;
+            border: 1px solid #334155;
+            text-align: left;
+        }
+
+        code {
+            font-family: monospace;
+            color: var(--accent);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Login View -->
+        <div id="login-section">
+            <h1>Welcome</h1>
+            <p>Our secure page <span id="app-version">Loading...</span></p>
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" placeholder="Enter username (e.g., admin)" required>
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit">Sign In</button>
+                <div id="error-msg">Invalid credentials</div>
+            </form>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard">
+            <div class="status-badge">● System Secure</div>
+            <h1 style="margin-top: 1rem;">Dashboard</h1>
+            <p>Authenticated Session Active</p>
+
+            <div class="data-box" id="secure-content">
+                Loading secure data...
+            </div>
+
+            <button onclick="logout()" style="background-color: #334155;">Sign Out</button>
+            <button onclick="loadAdminPanel()" style="background-color: #ef4444; margin-top: 10px;">Admin Panel</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        // Check if already logged in
+        const token = localStorage.getItem('jwt_token');
+        if (token) {
+            showDashboard(token);
+        }
+
+        // Fetch Version
+        fetch(`${API_URL}/api/version`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('app-version').textContent = `v${data.version}`;
+            })
+            .catch(() => {
+                document.getElementById('app-version').textContent = 'vUnknown';
+            });
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const errorMsg = document.getElementById('error-msg');
+
+            try {
+                const res = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('jwt_token', data.accessToken);
+                    errorMsg.style.display = 'none';
+                    showDashboard(data.accessToken);
+                } else {
+                    errorMsg.textContent = 'Login failed. Please try again.';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (err) {
+                errorMsg.textContent = 'Network error.';
+                errorMsg.style.display = 'block';
+            }
+        });
+
+        async function showDashboard(token) {
+            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+
+            const contentDiv = document.getElementById('secure-content');
+
+            try {
+                const res = await fetch(`${API_URL}/api/secure`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const html = await res.text();
+                    contentDiv.innerHTML = html;
+                } else {
+                    logout(); // Token likely expired
+                }
+            } catch (err) {
+                contentDiv.textContent = "Error fetching data.";
+            }
+        }
+
+        async function loadAdminPanel() {
+            const token = localStorage.getItem('jwt_token');
+            const contentDiv = document.getElementById('secure-content');
+
+            try {
+                const res = await fetch(`${API_URL}/admin`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const html = await res.text();
+                    contentDiv.innerHTML = html;
+                } else {
+                    contentDiv.innerHTML = '<span style="color: var(--error)">Access Denied: Admins Only</span>';
+                }
+            } catch (err) {
+                contentDiv.textContent = "Error fetching admin data.";
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('jwt_token');
+            window.location.reload();
+        }
+    </script>
+</body>
+
+</html>
